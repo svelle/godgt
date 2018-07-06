@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -75,14 +74,15 @@ func main() {
 
 func writeMessage(m *godgt.Message) {
 	if m.BoardUpdate != nil {
-		log.Print("BOARD: ", m.ToString())
-		rows := godgt.SimpleBoardFromFen(m.ToString())
-		for _, row := range rows {
-			log.Print(row)
-		}
+		print(time.Now().Format("2018-01-01T15:01:01.123 "), "BOARD: ", m.ToString(), "\n")
+		//log.Print("BOARD: ", m.ToString())
+		//rows := godgt.SimpleBoardFromFen(m.ToString())
+		//for _, row := range rows {
+		//	log.Print(row)
+		//}
 	} else if m.FieldUpdate != nil {
-		log.Print("FIELD: ", m.ToString())
+		//log.Print("FIELD: ", m.ToString())
 	} else {
-		log.Print("OTHER: ", m.ToString())
+		//log.Print("OTHER: ", m.ToString())
 	}
 }

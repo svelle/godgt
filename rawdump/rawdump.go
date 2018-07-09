@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"time"
-
 	"github.com/jessevdk/go-flags"
 	"github.com/kgigitdev/godgt"
+	"encoding/json"
+	"io/ioutil"
+	"log"
 )
 
 var opts struct {
@@ -16,6 +18,13 @@ var opts struct {
 	Size int `short:"s" long:"size" description:"Image size" default:"128"`
 
 	Filename string `short:"f" long:"filename" description:"File prefix for png image files" default:"boardupdate"`
+}
+
+type boardStatus struct {
+	MoveCount	int	`json:"moveCount"`
+	Timestamp   time.Time `json:"timestamp"`
+	BoardUpdate string `json:"boardUpdate"`
+	ImageFile   string `json:"imageFile"`
 }
 
 func main() {
@@ -32,27 +41,45 @@ func main() {
 	dgtboard.WriteCommand(godgt.DGT_SEND_BRD)
 	dgtboard.WriteCommand(godgt.DGT_SEND_UPDATE_BRD)
 
-	// Ask the board for a complete dump every 10 seconds.
-	go func() {
-		t := time.NewTicker(time.Second * 10)
-		for {
-			dgtboard.WriteCommand(godgt.DGT_SEND_BRD)
-			<-t.C
-		}
-	}()
-
 	go dgtboard.ReadLoop()
 
 	var messageCount int
+	var moveCount int
+
+	startTime := time.Now().Format("2006-01-02T15.04.05Z")
+	os.Mkdir(startTime, 0777)
+	logPath := "./" + startTime + "/log.json"
+
+	//fo, err := os.Create(logPath)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//defer func() {
+	//	if err := fo.Close(); err != nil {
+	//		panic(err)
+	//	}
+	//}()
+
+	var statusArray []boardStatus
 
 	for {
 		select {
 		case message := <-dgtboard.MessagesFromBoard:
 			messageCount++
-			writeMessage(message)
+			filename := fmt.Sprintf("%s/%s-%04d.png",
+				startTime, opts.Filename, moveCount)
+
+			statusArray = append(statusArray, writeLog(message, filename, &moveCount))
+			b, err := json.Marshal(statusArray)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				err := ioutil.WriteFile(logPath, b, 0666)
+				if err != nil{
+					log.Fatal(err)
+				}
+			}
 			if opts.Pngs && message.BoardUpdate != nil {
-				filename := fmt.Sprintf("%s-%04d.png",
-					opts.Filename, messageCount)
 				fen := message.BoardUpdate.ToString()
 				godgt.WritePng(fen, opts.Size, filename)
 				// Hack: always make a copy of the
@@ -60,10 +87,9 @@ func main() {
 				// name; this makes it possible to
 				// view it without having to work out
 				// the latest image.
-				latest := fmt.Sprintf("%s-latest.png",
-					opts.Filename)
+				latest := fmt.Sprintf("%s/%s-latest.png",
+					startTime, opts.Filename)
 				godgt.CopyFile(filename, latest)
-
 			}
 			if message.FieldUpdate != nil {
 				dgtboard.WriteCommand(godgt.DGT_SEND_BRD)
@@ -72,17 +98,17 @@ func main() {
 	}
 }
 
-func writeMessage(m *godgt.Message) {
+func writeLog(m *godgt.Message, fileName string, mc *int) boardStatus{
+	var currentStatus boardStatus
 	if m.BoardUpdate != nil {
-		print(time.Now().Format("2018-01-01T15:01:01.123 "), "BOARD: ", m.ToString(), "\n")
-		//log.Print("BOARD: ", m.ToString())
-		//rows := godgt.SimpleBoardFromFen(m.ToString())
-		//for _, row := range rows {
-		//	log.Print(row)
-		//}
-	} else if m.FieldUpdate != nil {
-		//log.Print("FIELD: ", m.ToString())
-	} else {
-		//log.Print("OTHER: ", m.ToString())
+		*mc++
+		currentStatus := boardStatus{
+			*mc,
+			time.Now(),
+			m.ToString(),
+			fileName,
+		}
+		return currentStatus
 	}
+	return currentStatus
 }

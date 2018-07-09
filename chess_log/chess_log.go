@@ -81,14 +81,6 @@ func main() {
 			if opts.Pngs && message.BoardUpdate != nil {
 				fen := message.BoardUpdate.ToString()
 				godgt.WritePng(fen, opts.Size, filename)
-				// Hack: always make a copy of the
-				// latest image to known, constant
-				// name; this makes it possible to
-				// view it without having to work out
-				// the latest image.
-				latest := fmt.Sprintf("%s/%s-latest.png",
-					startTime, opts.Filename)
-				godgt.CopyFile(filename, latest)
 			}
 			if message.FieldUpdate != nil {
 				dgtboard.WriteCommand(godgt.DGT_SEND_BRD)
